@@ -4,7 +4,7 @@ create table bot_user(
 );
 
 create table cost_category(
-    user_id bigint not null UNIQUE,
+    user_id bigint not null,
     cost_sum int not null,
     category_id int not null,
     created_at timestamp DEFAULT CURRENT_TIMESTAMP not null,
