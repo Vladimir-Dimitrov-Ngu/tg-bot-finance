@@ -1,5 +1,6 @@
+from io import BytesIO
 import logging
-from telegram import Update, constants
+from telegram import InputFile, Update, constants
 from telegram.ext import (
     ApplicationBuilder,
     ContextTypes,
@@ -7,17 +8,22 @@ from telegram.ext import (
     MessageHandler,
     ConversationHandler,
     filters,
+    CallbackQueryHandler,
 )
 import message_text
 import re
 import config
 import aiosqlite
 import sql_query
+import matplotlib.pyplot as plt
 from datetime import datetime
+from keyboard_telegram import _get_keyboard
 
 
 CATEGORY_NAME = []
 CATEGORY, PRODUCT_NAME = range(2)
+ALL_COST = []
+ALL_CATEGORY = []
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
@@ -47,11 +53,12 @@ async def category_cost(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     category, cost_sum = user_message.split()[0], user_message.split()[1]
     user_id = update.message.from_user["id"]
+    month = datetime.now().month
     if category in config.CATEGORY:
         category_id = config.CATEGORY_DICT[category]
         async with aiosqlite.connect(config.SQLITE_DB_FILE) as db:
             sql = sql_query.INSERT_CATEGORY_COST.format(
-                user_id=user_id, cost_sum=cost_sum, category_id=category_id
+                user_id=user_id, cost_sum=cost_sum, category_id=category_id, month=month
             )
             await db.execute(sql)
             await db.commit()
@@ -111,7 +118,86 @@ async def analysis(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(
                     chat_id=update.effective_chat.id,
                     text=message_text.ALL_COST_MESSAGE.format(all_cost=all_cost),
+                    reply_markup=_get_keyboard("Выйти", "Графики"),
                 )
+
+
+async def analys_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not query.data or not query.data.strip():
+        return
+    if query.data == "Графики":
+        ALL_COST.clear()
+        ALL_CATEGORY.clear()
+        user_id = 383333437
+        async with aiosqlite.connect(config.SQLITE_DB_FILE) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                sql_query.GET_COST_PER_CATEGORY_FOR_NOW_MONTH.format(user_id=user_id)
+            ) as cursor:
+                async for row in cursor:
+                    сost_category = row["cost"]
+                    category = row["category"]
+                    ALL_COST.append(сost_category)
+                    ALL_CATEGORY.append(config.CATEGORY_DICT_INVERSE[category])
+        plt.figure(figsize=(5, 5))
+        plt.pie(
+            ALL_COST,
+            labels=ALL_CATEGORY,
+            autopct="%1.1f%%",
+            startangle=90,
+            colors=config.COLORS,
+        )
+        plt.axis("equal")
+        buffer = BytesIO()
+        plt.savefig(buffer, format="png", bbox_inches="tight", dpi=300)
+        buffer.seek(0)
+        await context.bot.send_photo(
+            chat_id=update.effective_chat.id, photo=InputFile(buffer)
+        )
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Вот твои расходы в виде графика. Пойдем дальше?",
+            reply_markup=_get_keyboard("Выйти", "Детализация"),
+        )
+        return
+    elif query.data == "Детализация":
+        response = "Полная детализация: \n\n"
+        index = 1
+        cost_category_dict_sorted = dict(
+            sorted(
+                dict(zip(ALL_CATEGORY, ALL_COST)).items(),
+                key=lambda x: x[1],
+                reverse=True,
+            )
+        )
+        for category, cost in cost_category_dict_sorted.items():
+            response += f"{index}. <b>{category.capitalize()}</b> - {cost} рублей\n"
+            index += 1
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=response,
+            parse_mode=constants.ParseMode.HTML,
+        )
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Совет нужен?",
+            reply_markup=_get_keyboard("Выйти", "Совет", "Выйти", "Совет"),
+        )
+        return
+    elif query.data == "Совет":
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=message_text.ADVISE,
+            reply_markup=_get_keyboard(" ", " ", "Точно", "Все?"),
+        )
+        return
+    elif query.data == "Выйти":
+        await query.edit_message_text(
+            text="Давай тогда записывать дальше.\n\n Жмякай /cost",
+            parse_mode=constants.ParseMode.HTML,
+        )
 
 
 if __name__ == "__main__":
@@ -130,6 +216,8 @@ if __name__ == "__main__":
         filters.Regex(pattern=re.compile(r"\b(\w+)\s+(\d+)")), product_cost
     )
 
+    button_analysis = CallbackQueryHandler(analys_button)
+
     conv_handler = ConversationHandler(
         entry_points=[cost_handler],
         states={
@@ -142,5 +230,7 @@ if __name__ == "__main__":
     application.add_handler(analysis_handler)
     # application.add_handler(category_handler)
     application.add_handler(conv_handler)
+
+    application.add_handler(button_analysis)
 
     application.run_polling()

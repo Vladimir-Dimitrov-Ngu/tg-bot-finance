@@ -7,7 +7,7 @@ create table cost_category(
     user_id bigint not null,
     cost_sum int not null,
     category_id int not null,
-    created_at timestamp DEFAULT CURRENT_TIMESTAMP not null,
+    month int not null,
     foreign key(category_id) references category(id),
     foreign key(user_id) references bot_user(telegram_id)
 );

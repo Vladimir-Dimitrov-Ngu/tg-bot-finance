@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "tg-bot-finance"
+version = "0.1.0"
+description = ""
+authors = ["Vladimir Dimitrov <v.dimitrov@g.nsu.ru>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+python-telegram-bot = "^20.7"
+pandas = "^2.1.4"
+aiosqlite = "^0.19.0"
+matplotlib = "^3.8.2"
+
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^3.6.0"
+openai = "^1.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
