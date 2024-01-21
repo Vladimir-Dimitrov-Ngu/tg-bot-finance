@@ -1,0 +1,5 @@
+file.txt
+test.py
+bot_finance/__pycache__
+bot_finance/config.py
+bot_finance/db.sqlite3
