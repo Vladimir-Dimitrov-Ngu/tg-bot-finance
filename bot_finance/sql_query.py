@@ -17,3 +17,15 @@ SELECT SUM(cost_sum) AS cost, category_id  AS category FROM cost_category c
 WHERE user_id=383333437 AND month = CAST(strftime('%m', 'now') AS INTEGER)
 GROUP BY category_id;
 """
+
+INSERT_USER_DETAILS = """
+INSERT OR REPLACE INTO bot_user(telegram_id, created_at, sex, age, salary, hobbies, \
+where_live)
+VALUES ({telegram_id}, CURRENT_TIMESTAMP, '{sex}', {age}, {salary}, '{hobbies}', \
+'{where_live}')
+"""
+
+GET_DETAILS_PER_USER = """
+SELECT sex, age, salary, hobbies, where_live FROM bot_user
+WHERE telegram_id={telegram_id};
+"""

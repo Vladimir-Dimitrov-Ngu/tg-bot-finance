@@ -18,12 +18,17 @@ import sql_query
 import matplotlib.pyplot as plt
 from datetime import datetime
 from keyboard_telegram import _get_keyboard
-
+from connect_db import insert_into_db
+from yandex_gpt import _get_response_yandex_gpt
 
 CATEGORY_NAME = []
 CATEGORY, PRODUCT_NAME = range(2)
+ID = None
+
 ALL_COST = []
 ALL_CATEGORY = []
+DETAILS = {}
+MAIN_COST = None
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
@@ -35,6 +40,72 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def form(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        text="Давай познакомися. Кто ты?",
+        reply_markup=_get_keyboard(
+            "Мужчина", "Женщина", "Мужчина", "Женщина", prefix="form"
+        ),
+    )
+    return
+
+
+async def form_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    id = update.effective_chat.id
+    query = update.callback_query
+    await query.answer()
+    if not query.data or not query.data.strip():
+        return
+    answer = query.data.split("_")[1]
+    DETAILS["id"] = id
+    if answer == "Мужчина" or answer == "Женщина":
+        DETAILS["sex"] = answer
+        await query.edit_message_text(
+            text="Сколько тебе лет?",
+            reply_markup=_get_keyboard(
+                "Молодой", "Старший", "10-30", "31-60", prefix="form"
+            ),
+        )
+    elif answer == "Молодой" or answer == "Старший":
+        DETAILS["age"] = 20 if answer == "Молодой" else 40
+        await query.edit_message_text(
+            text="Сколько ты зарабатываешь?",
+            reply_markup=_get_keyboard(
+                "Средний", "Несредний", "до 50k", "от 50k", prefix="form"
+            ),
+        )
+    elif answer == "Средний" or answer == "Несредний":
+        DETAILS["salary"] = 50_000 if answer == "Средний" else 80_000
+        await query.edit_message_text(
+            text="Ты снимаешь жилье?",
+            reply_markup=_get_keyboard(
+                "Снимает", "Неснимает", "Да", "Нет", prefix="form"
+            ),
+        )
+    elif answer == "Снимает" or answer == "Неснимает":
+        DETAILS["where_live"] = answer
+        await query.edit_message_text(
+            text="Какие хобби ты предпочитаешь?",
+            reply_markup=_get_keyboard(
+                "Динамические", "Спокойные", "Динамические", "Спокойные", prefix="form"
+            ),
+        )
+    else:
+        DETAILS["hobbies"] = answer
+        await insert_into_db(
+            sql=sql_query.INSERT_USER_DETAILS.format(
+                telegram_id=DETAILS["id"],
+                sex=DETAILS["sex"],
+                age=DETAILS["age"],
+                salary=DETAILS["salary"],
+                hobbies=DETAILS["hobbies"],
+                where_live=DETAILS["where_live"],
+            )
+        )
+        await query.edit_message_text(text=message_text.MESSAGE_TTT)
+
+
+# исправить analysis и сделать как в form
 async def cost(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(
         chat_id=update.effective_chat.id, text=message_text.COST_MESSAGE
@@ -106,6 +177,14 @@ async def product_cost(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return PRODUCT_NAME
 
 
+# доделать
+async def personal_reccomend(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id, text={"Исходя из ваших персональных данных"}
+    )
+    return
+
+
 async def analysis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user["id"]
     async with aiosqlite.connect(config.SQLITE_DB_FILE) as db:
@@ -118,19 +197,23 @@ async def analysis(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(
                     chat_id=update.effective_chat.id,
                     text=message_text.ALL_COST_MESSAGE.format(all_cost=all_cost),
-                    reply_markup=_get_keyboard("Выйти", "Графики"),
+                    reply_markup=_get_keyboard("Выйти", "Графики", prefix="analys"),
                 )
 
 
 async def analys_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global MAIN_COST
     query = update.callback_query
+    id = update.effective_chat.id
     await query.answer()
     if not query.data or not query.data.strip():
         return
-    if query.data == "Графики":
+    answer = query.data.split("_")[1]
+    if answer == "Графики":
         ALL_COST.clear()
         ALL_CATEGORY.clear()
-        user_id = 383333437
+        # нужно починить user
+        user_id = id
         async with aiosqlite.connect(config.SQLITE_DB_FILE) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
@@ -159,10 +242,10 @@ async def analys_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Вот твои расходы в виде графика. Пойдем дальше?",
-            reply_markup=_get_keyboard("Выйти", "Детализация"),
+            reply_markup=_get_keyboard("Выйти", "Детализация", prefix="analys"),
         )
         return
-    elif query.data == "Детализация":
+    elif answer == "Детализация":
         response = "Полная детализация: \n\n"
         index = 1
         cost_category_dict_sorted = dict(
@@ -172,6 +255,7 @@ async def analys_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reverse=True,
             )
         )
+        MAIN_COST = list(cost_category_dict_sorted.keys())[0]
         for category, cost in cost_category_dict_sorted.items():
             response += f"{index}. <b>{category.capitalize()}</b> - {cost} рублей\n"
             index += 1
@@ -183,17 +267,34 @@ async def analys_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Совет нужен?",
-            reply_markup=_get_keyboard("Выйти", "Совет", "Выйти", "Совет"),
+            reply_markup=_get_keyboard(
+                "Выйти", "Совет", "Выйти", "Совет", prefix="analys"
+            ),
         )
         return
-    elif query.data == "Совет":
+    elif answer == "Совет":
+        async with aiosqlite.connect(config.SQLITE_DB_FILE) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                sql_query.GET_DETAILS_PER_USER.format(telegram_id=id)
+            ) as cursor:
+                async for row in cursor:
+                    details = {}
+                    details["age"] = row["age"]
+                    details["sex"] = row["sex"]
+                    details["salary"] = row["salary"]
+                    details["hobbies"] = row["hobbies"]
+                    details["where_live"] = row["where_live"]
+        details["all_cost"] = sum(ALL_COST)
+        details["main_category"] = MAIN_COST
+        print(details)
+        answer_yandex_gpt = _get_response_yandex_gpt(details)
+
         await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=message_text.ADVISE,
-            reply_markup=_get_keyboard(" ", " ", "Точно", "Все?"),
+            chat_id=update.effective_chat.id, text=answer_yandex_gpt
         )
         return
-    elif query.data == "Выйти":
+    elif answer == "Выйти":
         await query.edit_message_text(
             text="Давай тогда записывать дальше.\n\n Жмякай /cost",
             parse_mode=constants.ParseMode.HTML,
@@ -208,6 +309,7 @@ if __name__ == "__main__":
     cost_handler = CommandHandler("cost", cost)
     skip_handler = CommandHandler("skip", skip)
     analysis_handler = CommandHandler("analysis", analysis)
+    form_handler = CommandHandler("form", form)
 
     category_handler = MessageHandler(
         filters.Regex(pattern=re.compile(r"\b(\w+)\s+(\d+)")), category_cost
@@ -216,8 +318,8 @@ if __name__ == "__main__":
         filters.Regex(pattern=re.compile(r"\b(\w+)\s+(\d+)")), product_cost
     )
 
-    button_analysis = CallbackQueryHandler(analys_button)
-
+    button_analysis = CallbackQueryHandler(analys_button, pattern=r"analys_\w+")
+    button_form = CallbackQueryHandler(form_button, pattern=r"form_\w+")
     conv_handler = ConversationHandler(
         entry_points=[cost_handler],
         states={
@@ -228,9 +330,11 @@ if __name__ == "__main__":
     )
     application.add_handler(start_handler)
     application.add_handler(analysis_handler)
+    application.add_handler(form_handler)
     # application.add_handler(category_handler)
     application.add_handler(conv_handler)
 
     application.add_handler(button_analysis)
+    application.add_handler(button_form)
 
     application.run_polling()

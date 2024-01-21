@@ -1,6 +1,11 @@
 create table bot_user(
     telegram_id bigint not null UNIQUE,
-    created_at timestamp DEFAULT CURRENT_TIMESTAMP not null
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP not null,
+    sex varchar(255),
+    age int,
+    salary int,
+    hobbies varchar(255),
+    where_live varchar(255)
 );
 
 create table cost_category(
