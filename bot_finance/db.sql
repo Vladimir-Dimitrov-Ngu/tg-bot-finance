@@ -1,6 +1,19 @@
 create table bot_user(
     telegram_id bigint not null UNIQUE,
-    created_at timestamp DEFAULT CURRENT_TIMESTAMP not null
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP not null,
+    sex varchar(255),
+    age int,
+    salary int,
+    hobbies varchar(255),
+    where_live varchar(255)
+);
+
+create table gpt_answer(
+    id bigint not null,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP not null,
+    prompt text,
+    gpt_answer text,
+    name_gpt varchar(255)
 );
 
 create table cost_category(
@@ -41,5 +54,4 @@ insert into category(id, name) values
     (90, 'развлечение'),
     (100, 'другое');
 
-    
     
