@@ -8,6 +8,14 @@ create table bot_user(
     where_live varchar(255)
 );
 
+create table gpt_answer(
+    id bigint not null,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP not null,
+    prompt text,
+    gpt_answer text,
+    name_gpt varchar(255)
+);
+
 create table cost_category(
     user_id bigint not null,
     cost_sum int not null,
@@ -46,5 +54,4 @@ insert into category(id, name) values
     (90, 'развлечение'),
     (100, 'другое');
 
-    
     

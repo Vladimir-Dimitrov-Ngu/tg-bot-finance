@@ -11,6 +11,12 @@ def _get_response_yandex_gpt(details: dict):
     main_category = details["main_category"]
     where_live = details["where_live"]
     hobbies = ", ".join(details["hobbies"])
+    prompt_gpt = f"Привет, Финанс! Поскажи мне, грамотно ли я трачу свои деньги,\
+за этот месяц я потратил {all_cost} рублей.\
+Я {sex} {age} лет, зарабатываю {salary} рублей. Пока что я {where_live}\
+квартиру.\
+Люблю {hobbies} хобби. В основном трачу на {main_category}.\
+ Не нужно здороваться и представляться"
     prompt = {
         "modelUri": f"gpt://{catalog_id}/yandexgpt-lite",
         "completionOptions": {"stream": False, "temperature": 0.6, "maxTokens": "200"},
@@ -22,11 +28,7 @@ def _get_response_yandex_gpt(details: dict):
             },
             {
                 "role": "user",
-                "text": f"Привет, Финанс! Поскажи мне, грамотно ли я трачу свои деньги,\
-                за этот месяц я потратил {all_cost} рублей.\
-                Я {sex} {age} лет, зарабатываю {salary} рублей. Пока что я {where_live}\
-квартиру.\
-                Люблю {hobbies} хобби. В основном трачу на {main_category}",
+                "text": prompt_gpt,
             },
         ],
     }
@@ -40,7 +42,7 @@ def _get_response_yandex_gpt(details: dict):
     response = requests.post(url, headers=headers, json=prompt)
     result = response.text
     json_data = json.loads(result)
-    return json_data["result"]["alternatives"][0]["message"]["text"]
+    return json_data["result"]["alternatives"][0]["message"]["text"], prompt_gpt
 
 
 if __name__ == "__main__":

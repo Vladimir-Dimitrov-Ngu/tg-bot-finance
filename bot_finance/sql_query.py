@@ -11,6 +11,10 @@ GET_ALL_COST_PRODUCT = """SELECT SUM(price) as all_cost FROM product_name pn
 GROUP BY user_id
 HAVING user_id={user_id}"""
 
+GET_ALL_COST_PER_CATEGORY = """SELECT SUM(cost_sum) as cost FROM cost_category cc
+GROUP BY user_id and month=CAST(strftime('%m', 'now') AS INTEGER)
+HAVING user_id={telegram_id}"""
+
 
 GET_COST_PER_CATEGORY_FOR_NOW_MONTH = """
 SELECT SUM(cost_sum) AS cost, category_id  AS category FROM cost_category c
@@ -23,6 +27,11 @@ INSERT OR REPLACE INTO bot_user(telegram_id, created_at, sex, age, salary, hobbi
 where_live)
 VALUES ({telegram_id}, CURRENT_TIMESTAMP, '{sex}', {age}, {salary}, '{hobbies}', \
 '{where_live}')
+"""
+
+INSERT_GPT_ANSWER = """
+INSERT INTO gpt_answer(id, created_at, prompt, gpt_answer, name_gpt)
+VALUES ({telegram_id}, CURRENT_TIMESTAMP, '{prompt}', '{gpt_answer}', '{name_gpt}')
 """
 
 GET_DETAILS_PER_USER = """
