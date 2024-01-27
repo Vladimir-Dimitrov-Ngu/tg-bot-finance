@@ -57,6 +57,22 @@ async def form(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return
 
 
+async def note(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id, text=message_text.NOTE_MESSAGE
+    )
+    context.user_data["state"] = AWAITING_NOTE
+    return
+
+
+# выбирает категорию и мы ему выплевываем заметки
+async def notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id, text=message_text.NOTE_MESSAGE
+    )
+    return
+
+
 async def form_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     id = update.effective_chat.id
     query = update.callback_query
@@ -170,33 +186,47 @@ async def skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return CATEGORY
 
 
-async def note(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id, text="пиши что хочешь"
-    )
-    context.user_data["state"] = AWAITING_NOTE
-    return
-
-
 async def handle_text(update, context):
-    print("yep")
     user_message = update.message.text
-    if context.user_data.get("state") == AWAITING_NOTE:
+    if (
+        context.user_data.get("state") == AWAITING_NOTE
+        and user_message in config.CATEGORY
+    ):
         await context.bot.send_message(
-            chat_id=update.effective_chat.id, text=f"Ты написал: {user_message}"
+            chat_id=update.effective_chat.id, text=message_text.NOTE_CATEGORY_DONE
+        )
+        context.user_data["state"] = AWAITING_NOTE + 1
+    elif context.user_data.get("state") == AWAITING_NOTE + 1:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id, text=message_text.NOTE_END
         )
 
         context.user_data["state"] = None
+    elif (
+        context.user_data.get("state") == AWAITING_NOTE
+        and user_message not in config.CATEGORY
+    ):
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=message_text.NOTE_MESSAGE_ERROR,
+            parse_mode=constants.ParseMode.HTML,
+        )
+
     else:
         await context.bot.send_message(
-            chat_id=update.effective_chat.id, text=message_text.MEESAGE_FOR_ALL_TEXT
+            chat_id=update.effective_chat.id,
+            text=message_text.MEESAGE_FOR_ALL_TEXT,
+            parse_mode=constants.ParseMode.HTML,
         )
 
 
 async def product_cost(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_message = update.message.text
+    user_message = update.message.text.split()
     user_id = update.message.from_user["id"]
-    product_name, cost = user_message.split()[0], user_message.split()[1]
+    product_name, cost = (
+        " ".join(user_message[: len(user_message) - 1]),
+        user_message[-1],
+    )
     category_id = config.CATEGORY_DICT[CATEGORY_NAME[-1]]
 
     async with aiosqlite.connect(config.SQLITE_DB_FILE) as db:
