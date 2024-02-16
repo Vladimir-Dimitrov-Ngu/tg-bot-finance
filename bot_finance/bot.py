@@ -21,6 +21,7 @@ from keyboard_telegram import _get_keyboard
 from connect_db import insert_into_db, get_details_from_db
 from yandex_gpt import _get_response_yandex_gpt
 
+
 CATEGORY_NAME = []
 CATEGORY, PRODUCT_NAME = range(2)
 AWAITING_NOTE = 1
